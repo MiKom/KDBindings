@@ -261,6 +261,35 @@ TEST_CASE("Signal connections")
         REQUIRE(anotherCalled);
     }
 
+    SUBCASE("Connection evaluator informs about slot invocation being enqueued")
+    {
+        Signal<> signal;
+        bool slotCalled = false;
+
+        class MyConnectionEvaluator : public ConnectionEvaluator {
+        public:
+            int counter = 0;
+        protected:
+            void onSlotInvocationEnqueued() {
+                ++counter;
+            }
+        };
+
+        auto evaluator = std::make_shared<MyConnectionEvaluator>();
+        auto handle = signal.connectDeferred(evaluator, [&slotCalled]{ slotCalled = true; });
+
+        REQUIRE(evaluator->counter == 0);
+        signal.emit();
+
+        REQUIRE(slotCalled == false);
+        REQUIRE(evaluator->counter == 1);
+
+        evaluator->evaluateDeferredConnections();
+
+        REQUIRE(slotCalled == true);
+        REQUIRE(evaluator->counter == 1);
+    }
+
     SUBCASE("A signal with arguments can be connected to a lambda and invoked with l-value args")
     {
         Signal<std::string, int> signal;

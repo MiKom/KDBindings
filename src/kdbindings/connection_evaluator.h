@@ -66,14 +66,32 @@ public:
         m_deferredSlotInvocations.clear();
     }
 
+protected:
+    /**
+     * @brief Extension point for reacting when slot invocation is enqueued
+     * 
+     * Re-implement this method in your own ConnectionEvaluator to be informed when any slot
+     * invocation is enqueued.
+     * 
+     * For example, if you plan to evaluate (execute) the slot invocations in some "main" thread A
+     * and a signal is emitted in thread B, than this method is a good place to "wake up" the event
+     * loop of thread A.
+     * 
+     * This method is always evaluated in the thread that calls .emit() on the signal.
+     */
+    virtual void onSlotInvocationEnqueued() { }
+
 private:
     template<typename...>
     friend class Signal;
 
     void enqueueSlotInvocation(const ConnectionHandle &handle, const std::function<void()> &slotInvocation)
     {
-        std::lock_guard<std::mutex> lock(m_slotInvocationMutex);
-        m_deferredSlotInvocations.push_back({ handle, std::move(slotInvocation) });
+        {
+            std::lock_guard<std::mutex> lock(m_slotInvocationMutex);
+            m_deferredSlotInvocations.push_back({ handle, std::move(slotInvocation) });
+        }
+        onSlotInvocationEnqueued();
     }
 
     void dequeueSlotInvocation(const ConnectionHandle &handle)
